@@ -4,6 +4,7 @@ import { api, go, fmtDate, STATUS_LABEL, ACTION_LABEL } from '../api.js';
 import { useLoad, Loading, StatusPill, Refs } from '../ui.jsx';
 import { Segmented } from './CaseWorkspace.jsx';
 import Sheet from '../Sheet.jsx';
+import ForecastPanel from '../Forecast.jsx';
 
 const OUTCOMES = {
   archive: ['archive', 'retain'],
@@ -14,8 +15,28 @@ const OUTCOMES = {
 const SPRING = { type: 'spring', bounce: 0, duration: 0.35 };
 const shortId = id => id.split('-').pop();
 
+// Draft choices live in the browser only; Confirm is still the only thing that changes records.
+function useDrafts(reviewId) {
+  const key = `rw.drafts.${reviewId}`;
+  const [drafts, setDrafts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; }
+  });
+  useEffect(() => { localStorage.setItem(key, JSON.stringify(drafts)); }, [key, drafts]);
+  const setDraft = (sid, patch) => setDrafts(d => ({ ...d, [sid]: { ...d[sid], ...patch } }));
+  const clearDraft = sid => setDrafts(d => { const n = { ...d }; delete n[sid]; return n; });
+  return { drafts, setDraft, clearDraft };
+}
+
+const draftState = (s, d) => {
+  if (!d) return null;
+  if (d.deferred) return 'defer';
+  if (!d.outcome) return null;
+  return d.outcome === s.action || (s.action === 'needs_review' && d.outcome !== 'no_change') ? 'approve' : 'reject';
+};
+
 export default function Review({ reviewId }) {
   const { data, error, reload } = useLoad(`/reviews/${reviewId}`);
+  const { drafts, setDraft, clearDraft } = useDrafts(reviewId);
   const [active, setActive] = useState(null);
   const [saving, setSaving] = useState(new Set());
   const [failed, setFailed] = useState(new Set());
@@ -34,6 +55,14 @@ export default function Review({ reviewId }) {
   const hasDecisions = suggestions.some(s => s.decision);
   const failedPending = suggestions.filter(s => s.status === 'pending' && failed.has(s.id)).length;
 
+  const forecastDrafts = suggestions
+    .filter(s => s.status === 'pending' && draftState(s, drafts[s.id]))
+    .map(s => ({ suggestion_id: s.id, state: draftState(s, drafts[s.id]), outcome: drafts[s.id].outcome ?? null, note: drafts[s.id].reason || null }));
+  const forecastSignature = JSON.stringify([
+    forecastDrafts.map(d => [d.suggestion_id, d.state, d.outcome]),
+    suggestions.filter(s => s.decision).map(s => [s.id, s.decision.chosen_action]),
+  ]);
+
   const analyze = async () => {
     setBusy('analyze'); setPageError(null);
     try { await api(`/reviews/${reviewId}/analyze`, { method: 'POST' }); } catch (e) { setPageError(e.message); }
@@ -45,6 +74,7 @@ export default function Review({ reviewId }) {
     try {
       await api(`/suggestions/${s.id}/decide`, { method: 'POST', body });
       setFailed(p => { const n = new Set(p); n.delete(s.id); return n; });
+      clearDraft(s.id);
       await reload();
     } catch (e) {
       setFailed(p => new Set(p).add(s.id));
@@ -126,12 +156,16 @@ export default function Review({ reviewId }) {
             <motion.div layout className="stack">
               {suggestions.map(s => (
                 <SuggestionCard key={s.id} s={s} records={data.records} paragraphs={review.paragraphs} onOpen={setActive}
+                  draft={drafts[s.id] ?? {}} onDraft={patch => setDraft(s.id, patch)}
                   saving={saving.has(s.id)} onDecide={body => decide(s, body)} />
               ))}
             </motion.div>
           </div>
 
-          <Evidence paragraphs={review.paragraphs} active={active} />
+          <div className="side">
+            <ForecastPanel reviewId={reviewId} drafts={forecastDrafts} signature={forecastSignature} />
+            <Evidence paragraphs={review.paragraphs} active={active} />
+          </div>
         </div>
       )}
 
@@ -232,13 +266,15 @@ function Evidence({ paragraphs, active }) {
   );
 }
 
-function SuggestionCard({ s, records, paragraphs, onOpen, saving, onDecide }) {
+function SuggestionCard({ s, records, paragraphs, onOpen, saving, onDecide, draft, onDraft }) {
   const allowed = OUTCOMES[s.action];
-  const [outcome, setOutcome] = useState(s.action === 'needs_review' ? null : s.action);
+  const outcome = draft.outcome ?? null;
+  const reason = draft.reason ?? '';
+  const setOutcome = o => onDraft({ outcome: o });
+  const setReason = r => onDraft({ reason: r });
   const [target, setTarget] = useState(s.target_record_id ?? '');
   const [title, setTitle] = useState(s.title ?? '');
   const [content, setContent] = useState(s.proposed_content ?? s.record?.content ?? '');
-  const [reason, setReason] = useState('');
   const [err, setErr] = useState(null);
   const [confirmArchive, setConfirmArchive] = useState(false);
 
@@ -280,12 +316,12 @@ function SuggestionCard({ s, records, paragraphs, onOpen, saving, onDecide }) {
   }
 
   return (
-    <motion.article layout className="card suggestion" transition={SPRING}>
+    <motion.article layout className={`card suggestion${draft.deferred ? ' deferred' : ''}`} transition={SPRING}>
       <div className="sug-head">
         <span className="sid">{shortId(s.id)}</span>
         <span className={`badge a-${s.action}`}>{ACTION_LABEL[s.action]}</span>
         <strong className="grow">{s.title}</strong>
-        <span className="pill">Pending</span>
+        <span className={`pill${draft.deferred ? ' warn' : ''}`}>{draft.deferred ? 'Deferred' : 'Pending'}</span>
       </div>
       {s.target_record_id && <p className="small muted">Target: <code>{s.target_record_id}</code> {s.record?.title} · v{s.record?.version}</p>}
       <p>{s.reason}</p>
@@ -301,6 +337,12 @@ function SuggestionCard({ s, records, paragraphs, onOpen, saving, onDecide }) {
         </div>
       )}
 
+      {draft.deferred ? (
+        <div className="decide row">
+          <p className="small muted grow">Deferred — still unresolved. Resume when you're ready to decide.</p>
+          <button className="btn" onClick={() => onDraft({ deferred: false })}>Resume</button>
+        </div>
+      ) : (
       <div className="stack decide">
         <Segmented label={`Outcome for ${s.id}`} value={outcome} onChange={o => { setOutcome(o); setErr(null); }}
           options={allowed.map(o => [o, ACTION_LABEL[o]])} />
@@ -337,8 +379,11 @@ function SuggestionCard({ s, records, paragraphs, onOpen, saving, onDecide }) {
             onClick={() => (outcome === 'archive' ? setConfirmArchive(true) : submit())}>
             {saving ? 'Saving…' : `Confirm ${outcome ? ACTION_LABEL[outcome].toLowerCase() : ''}`}
           </button>
+          <button className="btn" onClick={() => onDraft({ deferred: true })} disabled={saving}>Defer</button>
+          {!outcome && <span className="small muted">Pick an outcome to preview its impact.</span>}
         </div>
       </div>
+      )}
 
       <Sheet open={confirmArchive} onClose={() => setConfirmArchive(false)} title="Archive record?"
         footer={<>

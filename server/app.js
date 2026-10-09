@@ -2,7 +2,7 @@ import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { tx, audit, now, insertRecord } from './db.js';
-import { validateOutput } from './analyze.js';
+import { validateOutput, validateForecast } from './analyze.js';
 import { parseCsv } from './csv.js';
 
 export const MAX_TRANSCRIPT_CHARS = 200_000;
@@ -241,6 +241,50 @@ export function createApp({ db, analyzer }) {
       result_record: s.decision?.target_record_id ? getRecord(c.id, s.decision.target_record_id) ?? null : null,
     }));
     res.json({ case: c, review, transcript, analysis: latestAnalysis(review.id), suggestions, records: caseRecords(c.id) });
+  });
+
+  // Live Impact Forecast: read-only. Draft choices come from the client and are never stored.
+  app.post('/api/reviews/:id/forecast', async (req, res) => {
+    const review = getReview(req.params.id);
+    const analysis = latestAnalysis(review.id) ?? fail(409, 'Analyze the transcript before forecasting.');
+    const suggestions = suggestionsOf(review.id);
+    const pending = new Map(suggestions.filter(s => s.status === 'pending').map(s => [s.id, s]));
+    const drafts = new Map();
+    for (const d of Array.isArray(req.body?.drafts) ? req.body.drafts : []) {
+      const s = pending.get(d?.suggestion_id);
+      if (!s || !['approve', 'reject', 'defer'].includes(d.state)) continue;
+      drafts.set(s.id, {
+        status: 'draft', state: d.state,
+        outcome: d.state !== 'defer' && OUTCOMES[s.action].includes(d.outcome) ? d.outcome : null,
+        note: text(d.note).slice(0, 500) || null,
+      });
+    }
+    const confirmed = suggestions.filter(s => s.decision).length;
+    if (!confirmed && !drafts.size) return res.json({ status: 'empty' });
+
+    const paragraphs = new Map(review.paragraphs.map(p => [p.id, p.text]));
+    const input = {
+      case: getCase(review.case_id).title,
+      meeting: review.title,
+      summary: review.reviewed_summary,
+      meeting_decisions: analysis.output.decisions.map(d => d.text),
+      open_questions: analysis.output.questions.map(q => q.text),
+      records: caseRecords(review.case_id).map(r => ({ id: r.id, title: r.title, type: r.type, status: r.status, version: r.version, content: r.content })),
+      recommendations: suggestions.map(s => ({
+        id: s.id, action: s.action, target_record_id: s.target_record_id, title: s.title, reason: s.reason,
+        proposed_content: s.proposed_content,
+        evidence: s.refs.map(r => ({ ref: r, text: paragraphs.get(r) })),
+        reviewer: s.decision
+          ? { status: 'confirmed', outcome: s.decision.chosen_action, note: s.decision.reason }
+          : drafts.get(s.id) ?? { status: 'undecided' },
+      })),
+    };
+    try {
+      const forecast = validateForecast(await analyzer.forecast(input));
+      res.json({ status: 'ok', forecast, based_on: { confirmed, drafts: drafts.size }, generated_at: now() });
+    } catch (e) {
+      res.status(502).json({ error: e.message });
+    }
   });
 
   app.put('/api/reviews/:id/summary', (req, res) => {

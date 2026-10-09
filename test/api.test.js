@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { openDb, seedDemo } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { bedrockAnalyzer, validateOutput } from '../server/analyze.js';
+import { bedrockAnalyzer, validateOutput, validateForecast } from '../server/analyze.js';
 import { parseCsv } from '../server/csv.js';
 
 const CASE = 'CASE-ELM-DP';
@@ -24,8 +24,22 @@ const OUTPUT = {
   ],
 };
 
-const stub = (output = OUTPUT) => {
-  const s = { model: 'stub', configured: true, calls: [], async analyze(input) { s.calls.push(input); return structuredClone(output); } };
+const FORECAST = {
+  impact: ['Archiving LD00002522 removes the 2021 commentary from the active set.', 'Second.', 'Third.', 'Fourth is dropped.'],
+  risks: ['Subscribers citing the 2021 commentary may lose a current reference.', 42, '  '],
+  next_steps: ['Cross-link the 2024 commentary before archiving.'],
+};
+
+const stub = (output = OUTPUT, forecastOutput = FORECAST) => {
+  const s = {
+    model: 'stub', configured: true, calls: [], forecastCalls: [],
+    async analyze(input) { s.calls.push(input); return structuredClone(output); },
+    async forecast(input) {
+      s.forecastCalls.push(input);
+      if (forecastOutput instanceof Error) throw forecastOutput;
+      return structuredClone(forecastOutput);
+    },
+  };
   return s;
 };
 
@@ -289,4 +303,84 @@ test('parseCsv handles quotes and embedded newlines', () => {
 
 test('validateOutput rejects output without a summary', () => {
   assert.throws(() => validateOutput({ suggestions: [] }, [], []), /summary/);
+});
+
+// Live Impact Forecast
+const auditCount = ctx => ctx.db.prepare('SELECT COUNT(*) n FROM audit_events').get().n;
+
+test('forecast shows the empty state without calling the AI when nothing is decided', async t => {
+  const ctx = await setup(t);
+  const { id } = await analyzed(ctx);
+  const r = await ctx.call('POST', `/reviews/${id}/forecast`, { drafts: [] });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.status, 'empty');
+  const junk = await ctx.call('POST', `/reviews/${id}/forecast`, { drafts: [{ suggestion_id: 'nope', state: 'approve' }, { suggestion_id: `${id}-S1`, state: 'explode' }] });
+  assert.equal(junk.body.status, 'empty', 'invalid drafts are ignored');
+  assert.equal(ctx.analyzer.forecastCalls.length, 0);
+});
+
+test('forecast reflects draft decisions, caps sections and never mutates records or audit', async t => {
+  const ctx = await setup(t);
+  const { id, by } = await analyzed(ctx);
+  const before = ctx.snapshot(), audits = auditCount(ctx);
+  const arc = by('Commentary 2021'), upd = by('Practice note 2022'), odom = by('Odom');
+  const r = await ctx.call('POST', `/reviews/${id}/forecast`, { drafts: [
+    { suggestion_id: arc.id, state: 'approve', outcome: 'archive', note: 'Superseded by 2024.' },
+    { suggestion_id: upd.id, state: 'reject', outcome: 'retain' },
+    { suggestion_id: odom.id, state: 'defer' },
+  ] });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.status, 'ok');
+  assert.equal(r.body.forecast.impact.length, 3);
+  assert.deepEqual(r.body.forecast.risks, ['Subscribers citing the 2021 commentary may lose a current reference.']);
+  assert.equal(r.body.forecast.next_steps.length, 1);
+  assert.deepEqual(r.body.based_on, { confirmed: 0, drafts: 3 });
+
+  const input = ctx.analyzer.forecastCalls[0];
+  const item = sid => input.recommendations.find(x => x.id === sid);
+  assert.deepEqual(item(arc.id).reviewer, { status: 'draft', state: 'approve', outcome: 'archive', note: 'Superseded by 2024.' });
+  assert.equal(item(upd.id).reviewer.state, 'reject');
+  assert.equal(item(odom.id).reviewer.state, 'defer');
+  assert.equal(item(by('Ghost').id).reviewer.status, 'undecided');
+  assert.ok(input.summary);
+  assert.ok(input.records.some(x => x.id === 'LD00002522'));
+  assert.ok(item(arc.id).evidence[0].text.includes('superseded'));
+
+  assert.equal(ctx.snapshot(), before);
+  assert.equal(auditCount(ctx), audits);
+  assert.equal(ctx.db.prepare('SELECT COUNT(*) n FROM decisions').get().n, 0);
+});
+
+test('forecast includes confirmed decisions and ignores drafts on resolved suggestions', async t => {
+  const ctx = await setup(t);
+  const { id, by } = await analyzed(ctx);
+  const arc = by('Commentary 2021');
+  await ctx.call('POST', `/suggestions/${arc.id}/decide`, { outcome: 'retain', reason: 'Still cited.' });
+  const r = await ctx.call('POST', `/reviews/${id}/forecast`, { drafts: [{ suggestion_id: arc.id, state: 'approve', outcome: 'archive' }] });
+  assert.equal(r.body.status, 'ok');
+  assert.deepEqual(r.body.based_on, { confirmed: 1, drafts: 0 });
+  const item = ctx.analyzer.forecastCalls[0].recommendations.find(x => x.id === arc.id);
+  assert.deepEqual(item.reviewer, { status: 'confirmed', outcome: 'retain', note: 'Still cited.' });
+});
+
+test('forecast failures return a clean error and change nothing', async t => {
+  const ctx = await setup(t, stub(OUTPUT, new Error('Bedrock request failed (403): Authentication failed')));
+  const { id, by } = await analyzed(ctx);
+  const before = ctx.snapshot();
+  const r = await ctx.call('POST', `/reviews/${id}/forecast`, { drafts: [{ suggestion_id: by('Odom').id, state: 'defer' }] });
+  assert.equal(r.status, 502);
+  assert.match(r.body.error, /403/);
+  assert.equal(ctx.snapshot(), before);
+  assert.equal((await ctx.call('POST', '/reviews/RV-NOPE/forecast', { drafts: [] })).status, 404);
+});
+
+test('missing Bedrock key fails the forecast cleanly', async t => {
+  const ctx = await setup(t, bedrockAnalyzer({ apiKey: '' }));
+  const r = await ctx.call('POST', `/cases/${CASE}/reviews`, { title: 'M', text: TEXT });
+  assert.equal((await ctx.call('POST', `/reviews/${r.body.id}/forecast`, { drafts: [] })).status, 409, 'needs an analysis first');
+});
+
+test('validateForecast rejects output with no usable sections', () => {
+  assert.throws(() => validateForecast({ impact: [], risks: [1], next_steps: '' }), /forecast/i);
+  assert.deepEqual(validateForecast({ impact: ['a'], risks: [], next_steps: ['b'] }), { impact: ['a'], risks: [], next_steps: ['b'] });
 });

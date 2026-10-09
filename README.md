@@ -28,6 +28,14 @@ On Windows PowerShell with script execution disabled, use `npm.cmd` instead of `
 
 The key stays on the server. Without a real key, analysis shows **Failed — "Bedrock key not configured"** with a Retry button, and no records change. Restart the server after editing `.env`.
 
+## Live Impact Forecast
+
+The review page has a sticky **Impact forecast** panel on the right (collapsible on narrow screens). As the reviewer picks outcomes, it asks Bedrock what the current decisions could mean for the case. Picking the suggested action counts as approving, Retain/Dismiss/No change as rejecting, and **Defer** postpones a decision. The forecast shows potential case impact, possible risks and suggested next steps.
+
+- Updates automatically, 650 ms after the last change, in the same panel. Confirmed decisions are included.
+- Draft picks and deferrals are saved in the browser only. **Confirm** is still the only thing that changes records.
+- Read-only: `POST /api/reviews/:id/forecast` never writes records, decisions or audit events. Output is labelled *AI-generated possible impacts, not confirmed outcomes*.
+
 ## Demo data
 
 On first start the database (`data/ripplewise.db`) is seeded with one legal case: 8 Elmere data-protection records taken from `center_data/C_legal/legal_documents.csv`. On the New meeting review screen, **Use demo transcript** loads a meeting that supports an add, an update, an archive and one uncertain item. Delete `data/` to reset.
