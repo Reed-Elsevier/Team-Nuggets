@@ -1,0 +1,25 @@
+Ana Reyes (Legal QA lead) opened the Elmere data protection precedent review. Present: Ana Reyes, Marco Santos (senior editor), Jill Tan (regulatory monitoring).
+
+Ana: The purpose today is to check whether our Elmere data protection set still reflects the law after the regulator's September notice, and to agree what needs to change.
+
+Jill: The Elmere Data Protection Authority published the Data Protection (Breach Notification) Regulations 2026 on 15 September 2026. They take effect on 1 January 2027 and require controllers to notify the Authority of a personal data breach within 72 hours of becoming aware of it. We do not have these regulations in the set at all.
+
+Ana: Agreed. We will add the Breach Notification Regulations 2026 to the set as a new regulation record, citing the Authority's notice.
+
+Marco: The 2022 practice note, Practice Note: Data Protection - key considerations, LD00002457, still describes compliance duties generally and says nothing about the new 72-hour breach notification duty. Readers relying on it from January would miss the obligation.
+
+Ana: Decision: the 2022 practice note will be updated to state that, from 1 January 2027, controllers must notify the Authority of a personal data breach within 72 hours under the Breach Notification Regulations 2026.
+
+Marco: The 2021 commentary, ELM2 COM 2021/754, has been superseded by the 2024 commentary, ELM2 COM 2024/299, which covers the same developments with the corrections we made last year. I would propose that the 2021 commentary be archived.
+
+Jill: I don't object in principle, but some subscribers still cite the 2021 commentary, so whatever we do it needs to stay accessible. Ana said she would look at it during review rather than decide now.
+
+Marco: One more. Odom v. Arith Partners, [2019] ELM2SC 202, is marked as overruled in our set, but I am not certain the later decision overruled the point on whether the search was lawful. It may only have reversed the order remitting the matter for rehearing.
+
+Jill: I also thought the 2025 le Guellec decision relied on Odom for the lawfulness analysis, which would be odd if Odom had been overruled on that point. We could not confirm either way in the meeting.
+
+Ana: Open question: does the Data Protection Act 2016 record need an amendment note once the 2026 regulations commence? Nobody was sure.
+
+Follow-ups: Jill will circulate the text of the Breach Notification Regulations 2026 by Friday. Someone needs to verify the status of Odom against the later decision; no owner was assigned.
+
+Ana closed the meeting.

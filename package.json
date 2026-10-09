@@ -1,0 +1,26 @@
+{
+  "name": "ripplewise",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "RippleWise — trace meeting decisions to the case records they affect, with reviewed, audited changes.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server/index.js --dev",
+    "build": "vite build",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "framer-motion": "^14.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
+  }
+}

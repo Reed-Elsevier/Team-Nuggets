@@ -1,0 +1,63 @@
+{
+  "id": "CASE-ELM-DP",
+  "title": "Veritas Legal — Elmere Data Protection Precedent Set",
+  "description": "Demo case seeded from center_data/C_legal/legal_documents.csv (practice area PRA006 Data Protection, jurisdiction JUR033 Commonwealth of Elmere). 100% synthetic data.",
+  "records": [
+    {
+      "id": "LD00002767",
+      "type": "Statute",
+      "title": "Data Protection Act 2009",
+      "content": "This statute sets out obligations relating to data protection in Commonwealth of Elmere, including scope, definitions, compliance duties and penalties. Enacted 2009-10-02. Status: Current.",
+      "source_ref": "ELM2 STA 2009/296 · center_data/C_legal/legal_documents.csv#LD00002767"
+    },
+    {
+      "id": "LD00003678",
+      "type": "Statute",
+      "title": "Data Protection Act 2016",
+      "content": "This statute sets out obligations relating to data protection in Commonwealth of Elmere, including scope, definitions, compliance duties and penalties. Enacted 2016-09-06. Status: Current.",
+      "source_ref": "ELM2 STA 2016/522 · center_data/C_legal/legal_documents.csv#LD00003678"
+    },
+    {
+      "id": "LD00002761",
+      "type": "Regulation",
+      "title": "Data Protection (Amendment) Regulations 2011",
+      "content": "This regulation sets out obligations relating to data protection in Commonwealth of Elmere, including scope, definitions, compliance duties and penalties. Enacted 2011-08-11. Status: Amended.",
+      "source_ref": "ELM2 REG 2011/429 · center_data/C_legal/legal_documents.csv#LD00002761"
+    },
+    {
+      "id": "LD00000610",
+      "type": "Case Law",
+      "title": "le Guellec v. The Securities Regulator",
+      "content": "The Elmere Tax Tribunal considered whether personal data was processed lawfully. The court held that the appeal should be allowed in part. The decision is relevant to data protection practitioners in Commonwealth of Elmere. Headnote: Data Protection - whether personal data was processed lawfully - held: the appeal should be allowed in part. Decided 2025-07-02.",
+      "source_ref": "[2025] ELM2TT 809 · center_data/C_legal/legal_documents.csv#LD00000610"
+    },
+    {
+      "id": "LD00006398",
+      "type": "Case Law",
+      "title": "Odom v. Arith Partners B.V.",
+      "content": "The Elmere Supreme Court considered whether the search was lawful. The court held that the matter should be remitted for rehearing. The decision is relevant to data protection practitioners in Commonwealth of Elmere. Headnote: Data Protection - whether the search was lawful - held: the matter should be remitted for rehearing. Decided 2019-03-05. Status: Overruled.",
+      "source_ref": "[2019] ELM2SC 202 · center_data/C_legal/legal_documents.csv#LD00006398"
+    },
+    {
+      "id": "LD00002457",
+      "type": "Practice Note",
+      "title": "Practice Note: Data Protection - key considerations (2022)",
+      "content": "This practice note sets out obligations relating to data protection in Commonwealth of Elmere, including scope, definitions, compliance duties and penalties. Published 2022-12-18.",
+      "source_ref": "ELM2 PRA 2022/991 · center_data/C_legal/legal_documents.csv#LD00002457"
+    },
+    {
+      "id": "LD00002522",
+      "type": "Commentary",
+      "title": "Commentary on Data Protection developments in Commonwealth of Elmere (2021)",
+      "content": "This commentary sets out obligations relating to data protection in Commonwealth of Elmere, including scope, definitions, compliance duties and penalties. Published 2021-04-22.",
+      "source_ref": "ELM2 COM 2021/754 · center_data/C_legal/legal_documents.csv#LD00002522"
+    },
+    {
+      "id": "LD00003117",
+      "type": "Commentary",
+      "title": "Commentary on Data Protection developments in Commonwealth of Elmere (2024)",
+      "content": "This commentary sets out obligations relating to data protection in Commonwealth of Elmere, including scope, definitions, compliance duties and penalties. Published 2024-07-13.",
+      "source_ref": "ELM2 COM 2024/299 · center_data/C_legal/legal_documents.csv#LD00003117"
+    }
+  ]
+}
